@@ -97,11 +97,11 @@ def serialize(obj):
     elif isinstance(obj, list):
         return serialize(np.array(obj, dtype=object))
 
-    elif isinstance(obj, float):
-        return serialize(np.array([obj], dtype=float))
+    elif isinstance(obj, np.float):
+        return serialize(np.array([[obj]], dtype=float))
 
-    elif isinstance(obj, int):
-        return serialize(np.array([obj], dtype=int))
+    elif isinstance(obj, np.int):
+        return serialize(np.array([[obj]], dtype=int))
 
     elif isinstance(obj, str):
         # convert a string to a 1d ndarray of char
