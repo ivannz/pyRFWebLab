@@ -1,4 +1,5 @@
 import struct
+import hashlib
 import numpy as np
 
 # ordered like in MATALB reference script
@@ -145,3 +146,19 @@ def deserialize(data, pos=0, encoding="utf8", flatten=True):
         output = str(b"".join(output), encoding=encoding)
 
     return output, pos
+
+
+
+def checksum(data):
+    # prepend an MD5-integrity check
+    md5 = hashlib.new("md5", data=data)
+    return md5.digest() + data
+
+
+def validate(data, pos=0):
+    (checksum,), pos = unpack("<16s", data, pos)
+
+    md5 = hashlib.new("md5", data[pos:]).digest()
+    assert checksum == md5
+
+    return data, pos
