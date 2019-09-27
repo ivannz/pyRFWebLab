@@ -1,13 +1,15 @@
 # py RF WebLab
 
-This is a python interface for the RF WebLab state-of-the-art measurement setup.
+This is a python interface for [RF WebLab](http://dpdcompetition.com/rfweblab/)
+state-of-the-art measurement setup.
 
 
-## Access Details
+# DPD competition
 
-For access using Matlab please visit [RF WebLab/access-details](http://dpdcompetition.com/rfweblab/access-details/).
+Please visit [RF WebLab/about](http://dpdcompetition.com/rfweblab/about/).
 
-### Common Restrictions
+
+## Access Details: Common Restrictions
 
 The following was taken verbatim from [RF WebLab/access-details](http://dpdcompetition.com/rfweblab/access-details/)
 
@@ -16,8 +18,3 @@ The following was taken verbatim from [RF WebLab/access-details](http://dpdcompe
 > A maximum of 1 000 000 IQ-data samples are accepted as input. If a file with more than 1 000 000 samples is uploaded, only the first 1 000 000 samples are actually used. The number of samples in the output data file (csv or dat) is of the same length as the input signal (or 1 000 000 samples if the input signal was longer).
 
 > The maximum sampling rate in both generator and analyzer is 200 MHz. The maximum useful bandwidth is 160 MHz. This means that any signal component you put outside of the frequency range [-80 80] MHz is removed before being sent from the signal generator. The signal that is received from the signal analyzer is also limited to 160 MHz bandwidth, i.e., use only the signal components in the range [-80 80] MHz because everything outside of this range is distorted by a filtering.
-
-
-## DPD competition
-
-Please visit [RF WebLab/about](http://dpdcompetition.com/rfweblab/about/).
