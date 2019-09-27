@@ -1,18 +1,25 @@
 import struct
 import numpy as np
 
+# ordered like in MATALB reference script
+fmt_dtype_pairs = [
+    ("d", 'float64'),  # double
+    ("f", 'float32'),  # single
+    ("?", 'bool'),     # logical
+    ("c", '<S1'),      # char
+    ("b", 'int8'),     # signed int8
+    ("B", 'uint8'),    # unsigned int8
+    ("h", 'int16'),    # signed int16 (short)
+    ("H", 'uint16'),   # unsigned int16 (short)
+    ("i", 'int32'),    # signed int32
+    ("I", 'uint32'),   # unsigned int32
+    ("q", 'int64'),    # signed int64 (long)
+    ("Q", 'uint64'),   # unsigned int64 (long)
+]
 
-dtype_to_fmt = {   
-    np.dtype('float64'): "d",
-    np.dtype('float32'): "f",
-    np.dtype('bool'):    "?",
-    np.dtype('int8'):    "b", np.dtype('uint8'):   "B",
-    np.dtype('int16'):   "h", np.dtype('uint16'):  "H",
-    np.dtype('int32'):   "i", np.dtype('uint32'):  "I",
-    np.dtype('int64'):   "q", np.dtype('uint64'):  "Q",
-}
-
-fmt_to_dtype = {v: k for k, v in dtype_to_fmt.items()}
+dtype_to_fmt = {np.dtype(d): f for f, d in fmt_dtype_pairs}
+fmt_to_dtype = {d: np.dtype(d) for f, d in fmt_dtype_pairs}
+cls_to_dtype = {i: np.dtype(d) for i, (f, d) in enumerate(fmt_dtype_pairs)}
 
 
 def unpack(fmt, data, pos=0):
@@ -97,20 +104,20 @@ def serialize(obj):
         encoded = bytes(obj, encoding="utf8")
         return serialize(np.frombuffer(encoded, np.dtype("<S1")))
 
-    assert isinstance(obj, np.ndarray)
+    assert isinstance(obj, np.ndarray), f"{obj} Unrecognized type `{type(obj)}`"
     if obj.dtype in dtype_to_fmt:
         return pack_ndarray(obj)
 
     head = struct.pack("B", 254)
     head += pack_shape(obj.shape, fmt="I")
-    return head + b"".join(map(serialize, *obj.ravel()))
+    return head + b"".join(map(serialize, obj.ravel()))
 
 
 def deserialize(data, pos=0, encoding="utf8"):
     # header
     (b_cls,), pos = unpack("B", data, pos)
     if b_cls == 255:
-        output = []
+        output = {}
         fields, pos = unpack_fields(data, pos, encoding=encoding)
         shape, pos = unpack_shape(data, pos)
         for field in fields:
@@ -126,4 +133,4 @@ def deserialize(data, pos=0, encoding="utf8"):
             arr.flat[i], pos = deserialize(data, pos, encoding=encoding)
         return arr, pos
 
-    return unpack_ndarray(data, pos)
+    return unpack_ndarray(data, cls_to_dtype[b_cls], pos)
