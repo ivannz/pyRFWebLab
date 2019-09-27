@@ -3,7 +3,7 @@ from distutils.core import setup, Extension
 setup(
     name="rfweblab",
     version="0.1",
-    description="""A pythonic interface to RFWebLab dpdchallenge.com.""",
+    description="""Pythonic interface to RFWebLab at dpdcompetition.com""",
     license="MIT License",
     author="Ivan Nazarov",
     author_email="ivan.nazarov@skolkovotech.ru",
