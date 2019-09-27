@@ -11,12 +11,12 @@ class ResultNotReadyError(urllib3.exceptions.HTTPError):
     pass
 
 
-def subimt(object):
+def subimt(data):
     url = """http://dpdcompetition.com/rfweblab/matlab/upload.php"""
 
     http = urllib3.PoolManager()
 
-    form = {"myFile": ("dummy.dat", checksum(serialize(object)),)}
+    form = {"myFile": ("dummy.dat", data,)}
     response = http.request_encode_body(
         "POST", url, encode_multipart=True,
         fields=form, retries=100, timeout=3.0)
