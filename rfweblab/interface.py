@@ -42,4 +42,5 @@ def fetch(filename):
         with zin.open(filename) as fin:
             data = fin.read()
 
-    return deserialize(data, pos=0, encoding="utf8")
+    object, pos = deserialize(data, pos=0, encoding="utf8")
+    return object
