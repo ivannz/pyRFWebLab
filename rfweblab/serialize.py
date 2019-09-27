@@ -18,7 +18,9 @@ fmt_dtype_pairs = [
 ]
 
 dtype_to_fmt = {np.dtype(d): f for f, d in fmt_dtype_pairs}
-fmt_to_dtype = {d: np.dtype(d) for f, d in fmt_dtype_pairs}
+fmt_to_dtype = {f: np.dtype(d) for f, d in fmt_dtype_pairs}
+
+dtype_to_cls = {np.dtype(d): i for i, (f, d) in enumerate(fmt_dtype_pairs)}
 cls_to_dtype = {i: np.dtype(d) for i, (f, d) in enumerate(fmt_dtype_pairs)}
 
 
@@ -87,6 +89,7 @@ def serialize(obj):
     if isinstance(obj, dict):
         head = struct.pack("B", 255)
         head += pack_fields(obj.keys())
+
         head += pack_shape([1], fmt="I")
         return head + b"".join(map(serialize, obj.values()))
 
@@ -106,20 +109,20 @@ def serialize(obj):
 
     assert isinstance(obj, np.ndarray), f"{obj} Unrecognized type `{type(obj)}`"
     if obj.dtype in dtype_to_fmt:
-        return pack_ndarray(obj)
+        head = struct.pack("B", dtype_to_cls[obj.dtype])
+        return head + pack_ndarray(obj)
 
     head = struct.pack("B", 254)
     head += pack_shape(obj.shape, fmt="I")
     return head + b"".join(map(serialize, obj.ravel()))
 
 
-def deserialize(data, pos=0, encoding="utf8"):
-    # header
+def deserialize(data, pos=0, encoding="utf8", flatten=True):
     (b_cls,), pos = unpack("B", data, pos)
     if b_cls == 255:
         output = {}
         fields, pos = unpack_fields(data, pos, encoding=encoding)
-        shape, pos = unpack_shape(data, pos)
+        shape, pos = unpack_shape(data, pos, fmt="I")
         for field in fields:
             value, pos = deserialize(data, pos, encoding=encoding)
             output[field] = value
@@ -127,10 +130,18 @@ def deserialize(data, pos=0, encoding="utf8"):
         return output, pos
 
     elif b_cls == 254:
-        shape, pos = unpack_shape(data, pos)
-        arr = np.empty(shape, dtype=object, order="C")
-        for i in range(arr.size):
-            arr.flat[i], pos = deserialize(data, pos, encoding=encoding)
-        return arr, pos
+        shape, pos = unpack_shape(data, pos, fmt="I")
+        output = np.empty(shape, dtype=object, order="C")
+        for i in range(output.size):
+            output.flat[i], pos = deserialize(data, pos, encoding=encoding)
 
-    return unpack_ndarray(data, cls_to_dtype[b_cls], pos)
+        if output.ndim == 1 and flatten:
+            output = output.tolist()
+
+        return output, pos
+
+    output, pos = unpack_ndarray(data, cls_to_dtype[b_cls], pos)
+    if b_cls == 3 and flatten:
+        output = str(b"".join(output), encoding=encoding)
+
+    return output, pos
