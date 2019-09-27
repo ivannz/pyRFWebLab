@@ -4,8 +4,6 @@ import urllib3
 from zipfile import ZipFile
 from io import BytesIO
 
-from .serialize import deserialize, serialize, checksum
-
 
 class ResultNotReadyError(urllib3.exceptions.HTTPError):
     pass
