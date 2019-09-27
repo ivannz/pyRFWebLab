@@ -9,7 +9,7 @@ class ResultNotReadyError(urllib3.exceptions.HTTPError):
     pass
 
 
-def subimt(data):
+def submit(data):
     url = """http://dpdcompetition.com/rfweblab/matlab/upload.php"""
 
     http = urllib3.PoolManager()
