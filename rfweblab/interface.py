@@ -35,7 +35,7 @@ def fetch(filename):
         raise ResultNotReadyError("Not found")
 
     # GET the file from the server
-    resp = http.request('GET', fresult, preload_content=True)
+    resp = http.request("GET", fresult, preload_content=True)
     with ZipFile(BytesIO(resp.data), mode="r") as zin:
         with zin.open(filename) as fin:
             data = fin.read()
