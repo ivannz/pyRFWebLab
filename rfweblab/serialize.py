@@ -78,7 +78,7 @@ def unpack_ndarray(data, dtype, pos=0):
 
 def serialize(obj):
     if isinstance(obj, dict):
-        head = struct.pack(f"<B", 255)
+        head = struct.pack("B", 255)
         head += pack_fields(obj.keys())
         head += pack_shape([1], fmt="I")
         return head + b"".join(map(serialize, obj.values()))
@@ -101,6 +101,29 @@ def serialize(obj):
     if a.dtype in dtype_to_fmt:
         return pack_ndarray(obj)
 
-    head = struct.pack(f"<B", 254)
+    head = struct.pack("B", 254)
     head += pack_shape(obj.shape, fmt="I")
     return head + b"".join(map(serialize, *obj.ravel()))
+
+
+def deserialize(data, pos=0, encoding="utf8"):
+    # header
+    (b_cls,), pos = unpack("B", data, pos)
+    if b_cls == 255:
+        output = []
+        fields, pos = unpack_fields(data, pos, encoding=encoding)
+        shape, pos = unpack_shape(data, pos)
+        for field in fields:
+            value, pos = deserialize(data, pos, encoding=encoding)
+            output[field] = value
+
+        return output, pos
+
+    elif b_cls == 254:
+        shape, pos = unpack_shape(data, pos)
+        arr = np.empty(shape, dtype=object, order="C")
+        for i in range(arr.size):
+            arr.flat[i], pos = deserialize(data, pos, encoding=encoding)
+        return arr, pos
+
+    return unpack_ndarray(data, pos)
