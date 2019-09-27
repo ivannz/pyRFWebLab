@@ -91,22 +91,23 @@ def serialize(obj):
         head = struct.pack("B", 255)
         head += pack_fields(obj.keys())
 
-        head += pack_shape([1], fmt="I")
+        head += pack_shape([1, 1], fmt="I")
         return head + b"".join(map(serialize, obj.values()))
 
     elif isinstance(obj, list):
         return serialize(np.array(obj, dtype=object))
 
-    elif isinstance(obj, np.float):
-        return serialize(np.array([[obj]], dtype=float))
+    elif isinstance(obj, (float, np.floating)):
+        return serialize(np.array([[obj]]))
 
-    elif isinstance(obj, np.int):
-        return serialize(np.array([[obj]], dtype=int))
+    elif isinstance(obj, (int, np.integer)):
+        return serialize(np.array([[obj]]))
 
     elif isinstance(obj, str):
         # convert a string to a 1d ndarray of char
         encoded = bytes(obj, encoding="utf8")
-        return serialize(np.frombuffer(encoded, np.dtype("<S1")))
+        charray = np.frombuffer(encoded, np.dtype("<S1"))
+        return serialize(charray[np.newaxis])
 
     assert isinstance(obj, np.ndarray), f"{obj} Unrecognized type `{type(obj)}`"
     if obj.dtype in dtype_to_fmt:
@@ -151,14 +152,16 @@ def deserialize(data, pos=0, encoding="utf8", flatten=True):
 
 def checksum(data):
     # prepend an MD5-integrity check
-    md5 = hashlib.new("md5", data=data)
-    return md5.digest() + data
+    prefix = struct.pack("<5sQQQ", b"uint8", 2, len(data), 1)
+
+    md5 = hashlib.new("md5", data=prefix)
+    md5.update(data)
+
+    return md5.digest()
 
 
 def validate(data, pos=0):
-    (checksum,), pos = unpack("<16s", data, pos)
-
-    md5 = hashlib.new("md5", data[pos:]).digest()
-    assert checksum == md5
+    (chkhash,), pos = unpack("16s", data, pos)
+    assert checksum(data[pos:]) == chkhash
 
     return data, pos
