@@ -98,7 +98,7 @@ def serialize(obj):
         return serialize(np.frombuffer(encoded, np.dtype("<S1")))
 
     assert isinstance(obj, np.ndarray)
-    if a.dtype in dtype_to_fmt:
+    if obj.dtype in dtype_to_fmt:
         return pack_ndarray(obj)
 
     head = struct.pack("B", 254)
