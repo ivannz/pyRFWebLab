@@ -30,18 +30,18 @@ def unpack_shape(data, pos=0, fmt="I"):
     return vector, pos
 
 
-def pack_string(obj, encoding="ascii"):
+def pack_string(obj, encoding="utf8"):
     b_str = bytes(obj, encoding=encoding)
     return struct.pack("<I", len(b_str)) + b_str
 
 
-def unpack_string(data, pos=0, encoding="ascii"):
+def unpack_string(data, pos=0, encoding="utf8"):
     (n_size,), pos = unpack("<I", data, pos)
     (string,), pos = unpack(f"<{n_size}s", data, pos)
     return str(string, encoding=encoding), pos
 
 
-def pack_fields(obj, encoding="ascii"):
+def pack_fields(obj, encoding="utf8"):
     assert len(obj) <= 255
     assert all(isinstance(el, str) for el in obj)
 
@@ -49,7 +49,7 @@ def pack_fields(obj, encoding="ascii"):
     return struct.pack(f"B", len(obj)) + b"".join(b_fields)
 
 
-def unpack_fields(data, pos=0, encoding="ascii"):
+def unpack_fields(data, pos=0, encoding="utf8"):
     strings = []
     (n_strings,), pos = unpack("B", data, pos)
     for _ in range(n_strings):
