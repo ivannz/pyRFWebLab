@@ -86,6 +86,24 @@ def unpack_ndarray(data, dtype, pos=0):
     return arr, pos
 
 
+def checksum(data):
+    # prepend an MD5-integrity check
+    prefix = struct.pack("<5sQQQ", b"uint8", 2, len(data), 1)
+
+    md5 = hashlib.new("md5", data=prefix)
+    md5.update(data)
+
+    return md5.digest()
+
+
+def validate(data, pos=0):
+    (chkhash,), pos = unpack("16s", data, pos)
+    assert checksum(data[pos:]) == chkhash
+
+    return data, pos
+
+
+
 def serialize(obj):
     if isinstance(obj, dict):
         head = struct.pack("B", 255)
@@ -147,21 +165,3 @@ def deserialize(data, pos=0, encoding="utf8", flatten=True):
         output = str(b"".join(output), encoding=encoding)
 
     return output, pos
-
-
-
-def checksum(data):
-    # prepend an MD5-integrity check
-    prefix = struct.pack("<5sQQQ", b"uint8", 2, len(data), 1)
-
-    md5 = hashlib.new("md5", data=prefix)
-    md5.update(data)
-
-    return md5.digest()
-
-
-def validate(data, pos=0):
-    (chkhash,), pos = unpack("16s", data, pos)
-    assert checksum(data[pos:]) == chkhash
-
-    return data, pos
