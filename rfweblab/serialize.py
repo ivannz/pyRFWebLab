@@ -74,3 +74,33 @@ def unpack_ndarray(data, dtype, pos=0):
         f"<{arr.size}{dtype_to_fmt[dtype]}", data, pos)
 
     return arr, pos
+
+
+def serialize(obj):
+    if isinstance(obj, dict):
+        head = struct.pack(f"<B", 255)
+        head += pack_fields(obj.keys())
+        head += pack_shape([1], fmt="I")
+        return head + b"".join(map(serialize, obj.values()))
+
+    elif isinstance(obj, list):
+        return serialize(np.array(obj, dtype=object))
+
+    elif isinstance(obj, float):
+        return serialize(np.array([obj], dtype=float))
+
+    elif isinstance(obj, int):
+        return serialize(np.array([obj], dtype=int))
+
+    elif isinstance(obj, str):
+        # convert a string to a 1d ndarray of char
+        encoded = bytes(obj, encoding="utf8")
+        return serialize(np.frombuffer(encoded, np.dtype("<S1")))
+
+    assert isinstance(obj, np.ndarray)
+    if a.dtype in dtype_to_fmt:
+        return pack_ndarray(obj)
+
+    head = struct.pack(f"<B", 254)
+    head += pack_shape(obj.shape, fmt="I")
+    return head + b"".join(map(serialize, *obj.ravel()))
