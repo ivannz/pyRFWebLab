@@ -6,9 +6,21 @@ def test_ndarray():
     from rfweblab.serialize import pack_ndarray, unpack_ndarray
     from rfweblab.serialize import dtype_to_fmt
 
-    arr = np.random.randn(10, 2, 3, 7) * 10
-
+    arr = np.random.rand(10) - 0.5
     for dtype in dtype_to_fmt:
+        if not dtype.isbuiltin:
+            continue
+
+        obj = arr.astype(dtype)
+        enc = pack_ndarray(obj)
+        dec, pos = unpack_ndarray(enc, dtype, pos=0)
+        assert np.allclose(dec, obj)
+
+    arr = np.random.randn(10, 2, 3, 7) * 10
+    for dtype in dtype_to_fmt:
+        if not dtype.isbuiltin:
+            continue
+
         obj = arr.astype(dtype)
         enc = pack_ndarray(obj)
         dec, pos = unpack_ndarray(enc, dtype, pos=0)
@@ -38,3 +50,21 @@ def test_fields():
     fields = tuple(map(str, range(255)))
     assert fields == unpack_fields(pack_fields(fields), 0)[0]
 
+
+def test_serialization():
+    from rfweblab.serialize import serialize, deserialize
+    def sede_helper(obj, pos=0):
+        res, pos = deserialize(serialize(obj), pos)
+        return res
+
+    assert sede_helper({}) == {}
+    assert sede_helper([]) == []
+
+    obj = "dfsg*N**N ( _URU(U£ª^¨º•˙ ∫ †ƒ#¶ªç€¶¢"
+    assert sede_helper(obj) == obj
+
+    obj = {"foo": "foo", "bar": 12_34_56, "baz": np.euler_gamma}
+    assert sede_helper(obj) == obj
+
+    obj = [["foo", "bar"], ["bar", "baz"]]
+    assert (sede_helper(obj) == obj).all()
