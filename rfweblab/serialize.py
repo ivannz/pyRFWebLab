@@ -4,18 +4,18 @@ import numpy as np
 
 # ordered like in MATALB reference script
 fmt_dtype_pairs = [
-    ("d", 'float64'),  # double
-    ("f", 'float32'),  # single
-    ("?", 'bool'),     # logical
-    ("c", '<S1'),      # char
-    ("b", 'int8'),     # signed int8
-    ("B", 'uint8'),    # unsigned int8
-    ("h", 'int16'),    # signed int16 (short)
-    ("H", 'uint16'),   # unsigned int16 (short)
-    ("i", 'int32'),    # signed int32
-    ("I", 'uint32'),   # unsigned int32
-    ("q", 'int64'),    # signed int64 (long)
-    ("Q", 'uint64'),   # unsigned int64 (long)
+    ("d", 'float64'),  #  0 double
+    ("f", 'float32'),  #  1 single
+    ("?", 'bool'),     #  2 logical
+    ("c", '<S1'),      #  3 string  (stored as bytes, handled specially)
+    ("b", 'int8'),     #  4 signed int8
+    ("B", 'uint8'),    #  5 unsigned int8
+    ("h", 'int16'),    #  6 signed int16 (short)
+    ("H", 'uint16'),   #  7 unsigned int16 (short)
+    ("i", 'int32'),    #  8 signed int32
+    ("I", 'uint32'),   #  9 unsigned int32
+    ("q", 'int64'),    # 10 signed int64 (long)
+    ("Q", 'uint64'),   # 11 unsigned int64 (long)
 ]
 
 dtype_to_fmt = {np.dtype(d): f for f, d in fmt_dtype_pairs}
@@ -83,6 +83,11 @@ def unpack_ndarray(data, dtype, pos=0):
     arr.flat[:], pos = unpack(
         f"<{arr.size}{dtype_to_fmt[dtype]}", data, pos)
 
+    # collapse explicit char arrays into byte strings
+    if dtype == np.dtype("<S1"):
+        *head, tail = shape
+        arr = arr.view(f"<S{tail}").reshape(head)
+
     return arr, pos
 
 
@@ -103,65 +108,90 @@ def validate(data, pos=0):
     return data, pos
 
 
-
 def serialize(obj):
     if isinstance(obj, dict):
-        head = struct.pack("B", 255)
-        head += pack_fields(obj.keys())
-
-        head += pack_shape([1, 1], fmt="I")
-        return head + b"".join(map(serialize, obj.values()))
+        # represent dict to a scalar struct (1x1)
+        dtype = np.dtype([(f, object) for f in obj.keys()])
+        return serialize(np.array([[tuple(obj.values())]], dtype=dtype))
 
     elif isinstance(obj, list):
+        # represent a list as a cell array:
+        # BUG: type/shape similar ndarrays in nested lists are misinterpreted
         return serialize(np.array(obj, dtype=object))
 
-    elif isinstance(obj, (float, np.floating)):
+    elif isinstance(obj, (float, int, np.floating, np.integer)):
+        # represent numeric scalars as 1x1 arrays
         return serialize(np.array([[obj]]))
 
-    elif isinstance(obj, (int, np.integer)):
-        return serialize(np.array([[obj]]))
+    elif isinstance(obj, (str, bytes)):
+        # get a bytes encoding of a string
+        obj = obj.encode() if isinstance(obj, str) else obj
 
-    elif isinstance(obj, str):
-        # convert a string to a 1d ndarray of char
-        encoded = bytes(obj, encoding="utf8")
-        charray = np.frombuffer(encoded, np.dtype("<S1"))
-        return serialize(charray[np.newaxis])
+        # (bug) byte arrays with zero bytes are note packed
+        # return serialize(np.frombuffer(obj, "<S1")[np.newaxis])
 
-    assert isinstance(obj, np.ndarray), f"{obj} Unrecognized type `{type(obj)}`"
-    if obj.dtype in dtype_to_fmt:
-        head = struct.pack("B", dtype_to_cls[obj.dtype])
-        return head + pack_ndarray(obj)
+        # emulate 1xlen ndarray of char
+        head = struct.pack("B", dtype_to_cls[np.dtype("<S1")])
+        head += pack_shape([1, len(obj)], fmt="I")
+        return head + struct.pack(f"<{len(obj)}s", obj)
 
-    head = struct.pack("B", 254)
-    head += pack_shape(obj.shape, fmt="I")
-    return head + b"".join(map(serialize, obj.ravel()))
+    elif not isinstance(obj, np.ndarray):
+        raise TypeError(f"`{obj}` Unrecognized type `{type(obj).__name__}`")
+
+    # if the data is of one of the basic types
+    if obj.dtype.names is not None:
+        # this is a structured array, i.e. array of `named` tuples
+        head = struct.pack("B", 255)
+        head += pack_fields(obj.dtype.names)
+        head += pack_shape(obj.shape, fmt="I")
+        return head + b"".join(serialize(el[fl])
+                               for el in obj.ravel()
+                               for fl in obj.dtype.names)
+
+    elif obj.dtype.kind == "O":
+        # this is an unstructured array of objects
+        head = struct.pack("B", 254)
+        head += pack_shape(obj.shape, fmt="I")
+        return head + b"".join(map(serialize, obj.ravel()))
+
+    elif obj.dtype not in dtype_to_fmt:
+        raise TypeError(f"Unrecognized data type `{obj.dtype}` in {obj}")
+
+    head = struct.pack("B", dtype_to_cls[obj.dtype])
+    return head + pack_ndarray(obj)
 
 
-def deserialize(data, pos=0, encoding="utf8", flatten=True):
+def deserialize(data, pos=0, encoding="utf8"):
     (b_cls,), pos = unpack("B", data, pos)
     if b_cls == 255:
-        output = {}
-        fields, pos = unpack_fields(data, pos, encoding=encoding)
+        # a struct can be a scalar, i.e. [1, 1] or an ndarray
+        #  (of equally sized elements)
+        fields, pos = unpack_fields(data, pos, encoding)
         shape, pos = unpack_shape(data, pos, fmt="I")
-        for field in fields:
-            value, pos = deserialize(data, pos, encoding=encoding)
-            output[field] = value
 
-        return output, pos
+        dtype = np.dtype([(f, "O") for f in fields])
+        output = np.empty(shape, dtype=dtype, order="C")
+        for el in range(output.size):
+            for fl in fields:
+                output.flat[el][fl], pos = deserialize(data, pos, encoding)
+
+        if output.size == 1:
+            output = {f: output[f].item() for f in output.dtype.names}
 
     elif b_cls == 254:
         shape, pos = unpack_shape(data, pos, fmt="I")
+
         output = np.empty(shape, dtype=object, order="C")
-        for i in range(output.size):
-            output.flat[i], pos = deserialize(data, pos, encoding=encoding)
+        for el in range(output.size):
+            output.flat[el], pos = deserialize(data, pos, encoding)
 
-        if output.ndim == 1 and flatten:
-            output = output.tolist()
+    else:
+        output, pos = unpack_ndarray(data, cls_to_dtype[b_cls], pos)
+        if output.dtype.kind == "S":  # `S` is for special
+            output = str(output.item(), encoding=encoding)
 
-        return output, pos
-
-    output, pos = unpack_ndarray(data, cls_to_dtype[b_cls], pos)
-    if b_cls == 3 and flatten:
-        output = str(b"".join(output), encoding=encoding)
+        elif output.size == 1:
+            # return a scalar instead of redundant 1x1x...x1 arrays
+            output = output.item()
 
     return output, pos

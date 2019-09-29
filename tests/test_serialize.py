@@ -53,18 +53,18 @@ def test_fields():
 
 def test_serialization():
     from rfweblab.serialize import serialize, deserialize
-    def sede_helper(obj, pos=0):
+    def dese_helper(obj, pos=0):
         res, pos = deserialize(serialize(obj), pos)
         return res
 
-    assert sede_helper({}) == {}
-    assert sede_helper([]) == []
+    assert dese_helper({}) == {}
+    assert dese_helper([]).tolist() == []
 
-    obj = "dfsg*N**N ( _URU(U£ª^¨º•˙ ∫ †ƒ#¶ªç€¶¢"
-    assert sede_helper(obj) == obj
+    obj = "dfsg*\x00N**N ( _URU\x00(уа34по©™{©^©*#{$©итц34п#}©#µ&#}¶© и¶√º£º©¶˜√]}*њU£ª^¨º•˙ ∫ †ƒ#¶ªç€¶¢"
+    assert dese_helper(obj) == obj
 
     obj = {"foo": "foo", "bar": 12_34_56, "baz": np.euler_gamma}
-    assert sede_helper(obj) == obj
+    assert dese_helper(obj) == obj
 
     obj = [["foo", "bar"], ["bar", "baz"]]
-    assert (sede_helper(obj) == obj).all()
+    assert (dese_helper(obj).tolist() == obj)
