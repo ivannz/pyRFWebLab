@@ -1,8 +1,9 @@
+import os
 import re
 import urllib3
 
 from zipfile import ZipFile
-from io import BytesIO
+from tempfile import TemporaryDirectory
 
 
 class ResultNotReadyError(urllib3.exceptions.HTTPError):
@@ -17,27 +18,53 @@ def submit(data):
     form = {"myFile": ("dummy.dat", data,)}
     response = http.request_encode_body(
         "POST", url, encode_multipart=True,
-        fields=form, retries=100, timeout=3.0)
+        fields=form, retries=10, timeout=3.0)
 
     match = re.search(rb"(output_[^\.]+\.dat)", response.data)
     return str(match.group(1), "utf8")
 
 
-def fetch(filename):
+def is_available(filename):
     base = """http://dpdcompetition.com/rfweblab/matlab/files"""
 
     http = urllib3.PoolManager()
-    fresult = f"{base}/{filename[:-3]}zip"
 
-    # see if a file exists
-    check = http.request("HEAD", fresult)
-    if check.status != 200:
-        raise ResultNotReadyError("Not found")
+    check = http.request("HEAD", f"{base}/{filename[:-3]}zip")
+    return check.status == 200
+
+
+def download(filename, path):
+    base = """http://dpdcompetition.com/rfweblab/matlab/files"""
+    assert os.path.isdir(path)
+
+    http = urllib3.PoolManager()
+
+    fname = f"{filename[:-3]}zip"
+    local = os.path.join(path, fname)
 
     # GET the file from the server
-    resp = http.request("GET", fresult, preload_content=True)
-    with ZipFile(BytesIO(resp.data), mode="r") as zin:
-        with zin.open(filename) as fin:
-            data = fin.read()
+    resp = http.request("GET", f"{base}/{fname}", preload_content=False)
+    try:
+        with open(local, "wb") as fin:
+            for chunk in resp.stream(65536):
+                fin.write(chunk)
 
-    return data
+    finally:
+        resp.release_conn()
+
+    return local
+
+
+def fetch(filename):
+    if not is_available(filename):
+        raise ResultNotReadyError("Not found")
+
+    with TemporaryDirectory() as tmpdir:
+        local = download(filename, path=tmpdir)
+
+        with ZipFile(local, mode="r") as zin:
+            with zin.open(filename) as fin:
+                data = fin.read()
+
+        return data
+
