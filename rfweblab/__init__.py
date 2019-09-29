@@ -64,7 +64,7 @@ def rfweblab(signal, rmsin=None):
     except:
         raise RuntimeError(f"Could not receive `{filename}`.")
 
-    status, error = reponse["status"][0, 0], reponse["error_hanlde"][0, 0]
+    status, error = reponse["status"], reponse["error_hanlde"]
     result.update({
         "status": int(status),
         "error": message(error),
@@ -73,9 +73,9 @@ def rfweblab(signal, rmsin=None):
     if status > 0:
         result.update({
             "y": np.ravel(reponse["b3_re"] + 1j * reponse["b3_im"]),
-            "rmsout": reponse["RMS_out"][0, 0],
-            "Idc": reponse["DCmeas"]["Id"][0, 0],
-            "Vdc": reponse["DCmeas"]["Vd"][0, 0],
+            "rmsout": reponse["RMS_out"],
+            "Idc": reponse["DCmeas"]["Id"],
+            "Vdc": reponse["DCmeas"]["Vd"],
         })
 
     return result
