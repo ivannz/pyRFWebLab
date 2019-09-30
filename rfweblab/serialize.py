@@ -176,7 +176,7 @@ def deserialize(data, pos=0, encoding="utf8"):
                 output.flat[el][fl], pos = deserialize(data, pos, encoding)
 
         if output.size == 1:
-            output = {f: output[f].item() for f in output.dtype.names}
+            output = {f: output[f].flat[0] for f in output.dtype.names}
 
     elif b_cls == 254:
         shape, pos = unpack_shape(data, pos, fmt="I")
@@ -192,6 +192,6 @@ def deserialize(data, pos=0, encoding="utf8"):
 
         elif output.size == 1:
             # return a scalar instead of redundant 1x1x...x1 arrays
-            output = output.item()
+            output = output.flat[0]
 
     return output, pos
